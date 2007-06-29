@@ -17,20 +17,21 @@
 	<script type="text/javascript" src="jquery.js"></script>
 	<script type="text/javascript">
 		var generating = false;
+		var lastImg = '';
 		
-		// set up fancy JS first
-		var lolcat = $('#lolcat');		
-		lolcat.load(function(){
-			$('#loading').html("LOLCat Generated!");
-			setTimeout(function(){
-				$('#loading').fadeOut(1000);
-			},3000);
-			generating = false;
+		// set up fancy JS first	
+		$(document).ready(function(){
+			$('#lolcat').load(function(){
+				$('#loading').html("LOLCat Generated!");
+				setTimeout(function(){
+					$('#loading').fadeOut(1000);
+				},3000);
+				generating = false;
+			});
+			$('#lolcat').error(function(){
+				$('#loading').html("Error! You no get LOLCat. :(");
+			});
 		});
-		lolcat.error(function(){
-			$('#loading').html("Error! You no get LOLCat. :(");
-		});
-		
 		
 		function show_cat(){
 			if (!generating){
@@ -39,10 +40,21 @@
 					$('#loading').html("You should specify text to display!");
 					return;
 				}
+				
 				generating = true;
 				$('#loading').fadeIn(500);
 				$('#loading').html("Loading LOLCat...");
-				$('#lolcat').attr("src","img.php?align=" + $("select[@name=align]").val() + "&text=" + $("input[@name=text]").val() + "&img=" + $("input[@name=image]").val());
+				
+				var img = "img.php?align=" + $("select[@name=align]").val() + "&text=" + $("input[@name=text]").val() + "&img=" + $("input[@name=image]").val();
+				if (lastImg != img){
+					$('#lolcat').attr("src",img + '&seed=' + Math.floor(Math.random()*30000));
+					
+					// fix possible problems with caching.. 
+					setTimeout(function(){
+						generating = false
+						},3000
+					);
+				}
 			}
 		}
 	</script>

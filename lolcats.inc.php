@@ -57,7 +57,6 @@ class Lolcat {
 		if (!(list($width, $height, $this->imgtype, $attr) = @getimagesize($image)))
 			return false;
 			
-		
 		// ensure position is correct
 		if (!in_array($position,array('tl','tr','bl','br')))
 			$position = 'tl';
@@ -248,6 +247,15 @@ class Lolcat {
 		
 		return false;
 	}
+	
+	function ShowError($text){
+		$img = imagecreate(400,50);
+		imagefill($img,0,0,imagecolorallocate($img,0,0,0));
+		imagestring($img,2,10,20,$text,imagecolorallocate($img,255,255,255));
+		header("Content-Type: image/gif");
+		imagegif($img);
+	}
+	
 }
 
 
