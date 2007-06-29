@@ -46,7 +46,7 @@ if ($img == ''){
 	$img = $images[mt_rand(0,count($images)-1)];
 }
 
-if (!$lolcat->Create($img,get_get_var('text'),get_get_var('align'),'impact.ttf',15,300))
+if (!$lolcat->Create($img,get_get_var('text'),get_get_var('align'),'cats/impact.ttf',15,300))
 	if (!headers_sent())
 		return $lolcat->ShowError("Error: I couldn't create a image for you :(");
 	else
