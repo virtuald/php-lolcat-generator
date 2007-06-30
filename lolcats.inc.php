@@ -23,23 +23,6 @@
 	
 	Of course, the creative among you will figure out how to integrate this with
 	other tools and make this script actually pseudo useful... 
-
-	Parameters:
-	
-	image 	= filename/url of image. WARNING: the function assumes that the 
-			image parameter has already been validated!! Otherwise, the user
-			could try and view arbitrary image files on your server.. 
-	
-	text	= text to be written as a lolcat string to the specified image
-	
-	align 	= 'tl' top left, 'tr' top right, 'bl' bottom left, 'br' bottom right
-		If no position given or invalid, it defaults to the top left
-		
-	font	= this is a reference
-	
-	fontsize = size (in pixels) of font. Defaults to 15
-	
-	
 	
 */
 
@@ -48,18 +31,60 @@ class Lolcat {
 	
 	var $img;		// Lolcat image
 	var $imgtype;	// type of image
+
+/*
+	Create()
 	
-	function Create($image,$text,$align,$font,$fontsize,$resize_width, $padding = 5, $text_color = -1){
+	This creates the LOLCat image. Parameters:
+	
+	image
+		filename/url of image. WARNING: the function assumes that the 
+		image parameter has already been validated!! Otherwise, the user
+		could try and view arbitrary image files on your server.. 
+	
+	text
+		text to be written as a lolcat string to the specified image
+	
+	align
+		'tl' top left, 'tr' top right, 'bl' bottom left, 'br' bottom right
+		If no position given or invalid, it defaults to the top left
+		
+	font
+		This is the physical path to the TTF file for the font.
+	
+	fontsize
+		(from docs) The font size. Depending on your version of GD, this 
+		should be specified as the pixel size (GD1) or point size (GD2).  
+		Defaults to 15
+	
+	resize_width (optional)
+		width to resize the outputted image to. The height is proportional 
+		to this number
+	
+	padding (optional)
+		the amount of space around the font
+	
+	text_color (optional)
+		an array of three values to be passed to imagecolorallocate (R, G, B). 
+		Defaults to white.
+	
+	shadow_color (optional)
+		an array of three values to be passed to imagecolorallocate (R, G, B).
+		Defaults to black.
+*/
+	
+	function Create($image,$text,$align,$font,$fontsize = 15,$resize_width = 0, $padding = 5, $text_color = -1, $shadow_color = -1){
 		
 		$this->img = false;
+		set_error_handler(array($this,"ErrorHandler"));
 		
 		// second, make sure its an image
 		if (!(list($width, $height, $this->imgtype, $attr) = @getimagesize($image)))
-			return false;
+			return $this->ShowError("Error: Cannot get parameters of specified image");
 			
 		// ensure position is correct
-		if (!in_array($position,array('tl','tr','bl','br')))
-			$position = 'tl';
+		if (!in_array($align,array('tl','tr','bl','br')))
+			$align = 'tl';
 		
 		// fix up the font size
 		$fontsize = str_replace('px','',trim($fontsize));
@@ -68,7 +93,7 @@ class Lolcat {
 			
 		// verify the font
 		if (!($font = realpath($font)))
-			return false;
+			return $this->ShowError("Error: Invalid font specified!");
 			
 		switch ($this->imgtype){
 			case 1:		// gif
@@ -85,10 +110,7 @@ class Lolcat {
 		}
 		
 		if (!$this->img)
-			return false;
-		
-		if ($text_color == -1)
-			$text_color = imagecolorallocate($this->img, 255, 255, 255);
+			return $this->ShowError("Error: Cannot use specified image");
 		
 		// see if we need to resize the image first
 		if ($resize_width != 0){
@@ -98,7 +120,8 @@ class Lolcat {
 			$resize_height = intval($height / $ratio);
 
 			$thumb_img = imagecreatetruecolor($resize_width, $resize_height);
-			imagecopyresampled($thumb_img, $this->img, 0, 0, 0, 0, $resize_width, $resize_height, $width, $height);
+			if (!imagecopyresampled($thumb_img, $this->img, 0, 0, 0, 0, $resize_width, $resize_height, $width, $height))
+				return $this->ShowError("Error: Could not resize image!");
 
 			// fix these
 			$height = $resize_height;
@@ -109,8 +132,20 @@ class Lolcat {
 			$this->img = $thumb_img;
 		}
 		
+		// allocate colors for text
+		if ($text_color === -1)
+			$text_color = imagecolorallocate($this->img, 255, 255, 255);
+		else
+			$text_color = imagecolorallocate($this->img, $text_color[0], $text_color[1], $text_color[2]);
+		
+		// allocate colors for text shadow
+		if ($shadow_color === -1)
+			$shadow_color = imagecolorallocate($this->img, 0, 0, 0);
+		else
+			$shadow_color = imagecolorallocate($this->img, $shadow_color[0], $shadow_color[1], $shadow_color[2]);
+		
 		// next, we should try to create the text.. hopefully it wraps nicely
-		putenv('GDFONTPATH=' . realpath('.'));		// hack
+		putenv('GDFONTPATH=' . realpath('.'));		// hack, just in case
 		
 		// grab the font height, M is supposed to be big, with any random chars lying around
 		$font_height = $this->img_height(imagettfbbox($fontsize,0,$font,'Mjg'));
@@ -144,7 +179,7 @@ class Lolcat {
 		$line_beginning = $i;
 		
 		// draw text elements starting from alignment position.. 
-		for (;$i >= 0 && $i <= $c;$i += $inc){
+		for (;$i >= 0 && $i < $c;$i += $inc){
 			
 			$lf_width = $this->img_width(imagettfbbox($fontsize,0,$font,$text_elements[$i]));
 			
@@ -165,6 +200,7 @@ class Lolcat {
 					$text = implode(' ',array_slice($text_elements,$line_beginning,$i - $line_beginning));
 			
 				// draw the text
+				imagettftext($this->img,$fontsize,0,$left-1,$top+1,$shadow_color,$font,$text);
 				imagettftext($this->img,$fontsize,0,$left,$top,$text_color,$font,$text);
 			
 				// keep moving, reset params
@@ -188,23 +224,20 @@ class Lolcat {
 			else
 				$text = implode(' ',array_slice($text_elements,$line_beginning,$i - $line_beginning));		
 			
+			imagettftext($this->img,$fontsize,0,$left-1,$top+1,$shadow_color,$font,$text);
 			imagettftext($this->img,$fontsize,0,$left,$top,$text_color,$font,$text);
 		}
+		
+		imagecolordeallocate($this->img,$shadow_color);
+		imagecolordeallocate($this->img,$text_color);
+		
+		restore_error_handler();
 		
 		return true;
 	}
 
-	// utility functions
-
-	function img_width($sz_array){
-		return abs(max($sz_array[0] - $sz_array[2], $sz_array[4] - $sz_array[6]));
-	}
-
-	function img_height($sz_array){
-		return abs(max($sz_array[7] - $sz_array[1], $sz_array[5] - $sz_array[3]));
-	}
 	
-	function Show(){
+	function Show($destroy = true){
 	
 		// if the image is still valid, then we should output it at the end
 		if (!$this->img)
@@ -227,10 +260,13 @@ class Lolcat {
 				return false;
 		}
 		
+		if ($destroy)
+			imagedestroy($this->img);
+		
 		return true;
 	}
 	
-	function WriteToFile($file){
+	function WriteToFile($file, $destroy = true){
 	
 		// if the image is still valid, then we should output it at the end
 		if (!$this->img)
@@ -245,15 +281,47 @@ class Lolcat {
 				return @imagepng($this->img,$file);
 		}
 		
+		if ($destroy)
+			imagedestroy($this->img);
+		
 		return false;
 	}
 	
+	
+	// utility functions
+	function img_width($sz_array){
+		return abs(max($sz_array[0] - $sz_array[2], $sz_array[4] - $sz_array[6]));
+	}
+
+	function img_height($sz_array){
+		return abs(max($sz_array[7] - $sz_array[1], $sz_array[5] - $sz_array[3]));
+	}
+	
+	// shows an error... always returns false
 	function ShowError($text){
+	
+		if (headers_sent())
+			return false;
+			
 		$img = imagecreate(400,50);
 		imagefill($img,0,0,imagecolorallocate($img,0,0,0));
-		imagestring($img,2,10,20,$text,imagecolorallocate($img,255,255,255));
+		$top = 10;
+		foreach (explode("\n",$text) as $t){
+			imagestring($img,2,10,$top,$t,imagecolorallocate($img,255,255,255));
+			$top+=15;
+		}
+		
 		header("Content-Type: image/gif");
 		imagegif($img);
+		imagedestroy($img);
+		return false;
+	}
+	
+	// used to catch any errors that may occur.. shows them in image format,
+	// so the user can actually see them! 
+	function ErrorHandler($errno,$errstr, $errfile = "", $errline = 0, $errcontext = null){
+		$this->ShowError("Error $errno: $errstr" . ($errfile != "" ? "\n" . basename($errfile) . " at line $errline" : ""));
+		die();
 	}
 	
 }
